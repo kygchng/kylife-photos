@@ -7,26 +7,41 @@ import { useCanvasControls } from "@/lib/useCanvasControls";
 import MemoryDetailView from "./MemoryDetailView";
 import type { Memory } from "@/data/memories";
 
-// target:  5 columns × 3 rows visible at 1440×900
+// Target: ~5 columns × ~3 rows visible at 1440×900 (no zoom ever)
 export const CELL_W = 290;
 export const CELL_H = 312;
 
-// polaroid card dimensions
-const CARD_W = 174;
+const PADDING_SIDE = 8;
 const PADDING_TOP = 8;
-const IMG_H = 202;
 const FOOTER_H = 36;
-const CARD_H = PADDING_TOP + IMG_H + FOOTER_H; // = 246px
 
-// centering margins within each cell
-const MARGIN_X = (CELL_W - CARD_W) / 2; // = 58px
-const MARGIN_Y = (CELL_H - CARD_H) / 2; // = 33px
+// Portrait card
+const PORT_IMG_W = 160; // inner image width
+const PORT_IMG_H = 204;
+const PORT_CARD_W = PORT_IMG_W + PADDING_SIDE * 2; // 176
+const PORT_CARD_H = PADDING_TOP + PORT_IMG_H + FOOTER_H; // 248
 
-// extra cells to render outside viewport edges (prevents pop-in on fast pan)
+// Landscape card
+const LAND_IMG_W = 232; // inner image width
+const LAND_IMG_H = 150;
+const LAND_CARD_W = LAND_IMG_W + PADDING_SIDE * 2; // 248
+const LAND_CARD_H = PADDING_TOP + LAND_IMG_H + FOOTER_H; // 194
+
+// Centering margins per orientation
+const PORT_MX = (CELL_W - PORT_CARD_W) / 2; // 57px
+const PORT_MY = (CELL_H - PORT_CARD_H) / 2; // 32px
+const LAND_MX = (CELL_W - LAND_CARD_W) / 2; // 21px
+const LAND_MY = (CELL_H - LAND_CARD_H) / 2; // 59px
+
 const BUFFER = 2;
-
 const TILE_W = 5;
 const TILE_H = 3;
+
+function isLandscapeCell(col: number, row: number): boolean {
+  if (col === 0 && row === 0) return false; // kylife cell is always portrait-shaped
+  const val = col * 127 + row * 311 + col * row * 23;
+  return ((val % 4) + 4) % 4 === 1;
+}
 
 function getMemoryForCell(col: number, row: number): Memory | null {
   if (col === 0 && row === 0) return null;
@@ -39,13 +54,18 @@ function GridCard({
   memory,
   x,
   y,
+  landscape,
   onClick,
 }: {
   memory: Memory;
   x: number;
   y: number;
+  landscape: boolean;
   onClick: () => void;
 }) {
+  const cardW = landscape ? LAND_CARD_W : PORT_CARD_W;
+  const imgH = landscape ? LAND_IMG_H : PORT_IMG_H;
+
   return (
     <motion.div
       data-polaroid
@@ -60,12 +80,12 @@ function GridCard({
         position: "absolute",
         left: x,
         top: y,
-        width: CARD_W,
+        width: cardW,
         backgroundColor: "#ffffff",
         boxShadow: "0 3px 14px rgba(0,0,0,0.09), 0 1px 3px rgba(0,0,0,0.06)",
         paddingTop: PADDING_TOP,
-        paddingLeft: 8,
-        paddingRight: 8,
+        paddingLeft: PADDING_SIDE,
+        paddingRight: PADDING_SIDE,
         cursor: "pointer",
         willChange: "transform",
       }}
@@ -74,12 +94,12 @@ function GridCard({
       <img
         src={memory.coverImage}
         alt={memory.title}
-        width={CARD_W - 16}
-        height={IMG_H}
+        width={cardW - PADDING_SIDE * 2}
+        height={imgH}
         style={{
           display: "block",
           width: "100%",
-          height: IMG_H,
+          height: imgH,
           objectFit: "cover",
         }}
         draggable={false}
@@ -122,6 +142,7 @@ function GridCard({
   );
 }
 
+// ─── KylifeCell ────────────────────────────────────────────────────────────────
 function KylifeCell({ x, y }: { x: number; y: number }) {
   return (
     <div
@@ -170,6 +191,7 @@ function KylifeCell({ x, y }: { x: number; y: number }) {
   );
 }
 
+// ─── Main canvas ───────────────────────────────────────────────────────────────
 export default function DevelopedCanvas() {
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
   const [vpSize, setVpSize] = useState({ w: 1440, h: 900 });
@@ -230,9 +252,8 @@ export default function DevelopedCanvas() {
         className="canvas-root"
         {...panHandlers}
         onPointerDown={(e) => {
-          if (!selectedMemory) {
+          if (!selectedMemory)
             (e.currentTarget as HTMLDivElement).style.cursor = "grabbing";
-          }
           panHandlers.onPointerDown(e);
         }}
         onPointerUp={(e) => {
@@ -266,15 +287,16 @@ export default function DevelopedCanvas() {
         >
           {visibleCells.map(({ col, row }) => {
             const memory = getMemoryForCell(col, row);
-            const cellOriginX = col * CELL_W;
-            const cellOriginY = row * CELL_H;
+            const landscape = isLandscapeCell(col, row);
+            const mx = landscape ? LAND_MX : PORT_MX;
+            const my = landscape ? LAND_MY : PORT_MY;
 
             if (!memory) {
               return (
                 <KylifeCell
                   key={`${col}-${row}`}
-                  x={cellOriginX}
-                  y={cellOriginY}
+                  x={col * CELL_W}
+                  y={row * CELL_H}
                 />
               );
             }
@@ -283,8 +305,9 @@ export default function DevelopedCanvas() {
               <GridCard
                 key={`${col}-${row}`}
                 memory={memory}
-                x={cellOriginX + MARGIN_X}
-                y={cellOriginY + MARGIN_Y}
+                x={col * CELL_W + mx}
+                y={row * CELL_H + my}
+                landscape={landscape}
                 onClick={() => setSelectedMemory(memory)}
               />
             );
