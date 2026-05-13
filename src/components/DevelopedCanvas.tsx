@@ -142,7 +142,6 @@ function GridCard({
   );
 }
 
-// ─── KylifeCell ────────────────────────────────────────────────────────────────
 function KylifeCell({ x, y }: { x: number; y: number }) {
   return (
     <div
@@ -191,17 +190,21 @@ function KylifeCell({ x, y }: { x: number; y: number }) {
   );
 }
 
-// ─── Main canvas ───────────────────────────────────────────────────────────────
 export default function DevelopedCanvas() {
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
-  const [vpSize, setVpSize] = useState({ w: 1440, h: 900 });
+  // Lazy initializer reads real dimensions on the client; SSR falls back to 1440×900.
+  // This avoids a synchronous setState inside the effect body.
+  const [vpSize, setVpSize] = useState<{ w: number; h: number }>(() =>
+    typeof window !== "undefined"
+      ? { w: window.innerWidth, h: window.innerHeight }
+      : { w: 1440, h: 900 },
+  );
 
   const { panX, panY, canvasRef, panHandlers } = useCanvasControls(
     selectedMemory !== null,
   );
 
   useEffect(() => {
-    setVpSize({ w: window.innerWidth, h: window.innerHeight });
     const onResize = () =>
       setVpSize({ w: window.innerWidth, h: window.innerHeight });
     window.addEventListener("resize", onResize);
