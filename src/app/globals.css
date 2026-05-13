@@ -1,26 +1,47 @@
 @import "tailwindcss";
+@import "@fontsource/lora/400.css";
+@import "@fontsource/lora/600.css";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --canvas-bg: #f7f4ef;
+  --canvas-dot: #dedad4;
+  --polaroid-white: #ffffff;
+  --polaroid-shadow:
+    0 4px 20px rgba(0, 0, 0, 0.1), 0 1px 3px rgba(0, 0, 0, 0.07);
+  --polaroid-shadow-hover:
+    0 8px 32px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.1);
+  --text-caption: #6b6560;
+  --text-title: #2a2520;
+  --overlay-bg: rgba(247, 244, 239, 0.88);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--canvas-bg);
+  --color-foreground: var(--text-title);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-serif: "Lora", Georgia, serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  background: var(--canvas-bg);
+  color: var(--text-title);
+  color-scheme: light;
+}
+
+/* prevent momentum scroll on canvas */
+.canvas-root {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
 }
