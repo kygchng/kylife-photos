@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
-import { Geist_Mono, Lora, Caveat } from "next/font/google";
+import { Geist_Mono, Lora, Caveat, Geist } from "next/font/google";
 import "./globals.css";
+import { cn } from "@/lib/utils";
+
+const geist = Geist({subsets:['latin'],variable:'--font-sans'});
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -32,7 +35,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistMono.variable} ${lora.variable} ${caveat.variable} h-full`}
+      className={cn("h-full", geistMono.variable, lora.variable, caveat.variable, "font-sans", geist.variable)}
     >
       <body className="h-full overflow-hidden">{children}</body>
     </html>

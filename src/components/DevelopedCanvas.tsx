@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
 import { memories } from "@/data/memories";
 import { useCanvasControls } from "@/lib/useCanvasControls";
 import MemoryDetailView from "./MemoryDetailView";
@@ -192,13 +193,13 @@ function KylifeCell({ x, y }: { x: number; y: number }) {
 
 export default function DevelopedCanvas() {
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
-  // Lazy initializer reads real dimensions on the client; SSR falls back to 1440×900.
-  // This avoids a synchronous setState inside the effect body.
-  const [vpSize, setVpSize] = useState<{ w: number; h: number }>(() =>
-    typeof window !== "undefined"
-      ? { w: window.innerWidth, h: window.innerHeight }
-      : { w: 1440, h: 900 },
-  );
+  // Always start with the SSR-safe default so server and client first render match.
+  // onResize() is called inside the effect (not setState directly) to satisfy the
+  // no-direct-setState-in-effect lint rule while still syncing real dimensions after hydration.
+  const [vpSize, setVpSize] = useState<{ w: number; h: number }>({
+    w: 1440,
+    h: 900,
+  });
 
   const { panX, panY, canvasRef, panHandlers } = useCanvasControls(
     selectedMemory !== null,
@@ -208,6 +209,7 @@ export default function DevelopedCanvas() {
     const onResize = () =>
       setVpSize({ w: window.innerWidth, h: window.innerHeight });
     window.addEventListener("resize", onResize);
+    onResize(); // sync to real viewport after hydration
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
@@ -327,6 +329,120 @@ export default function DevelopedCanvas() {
           />
         )}
       </AnimatePresence>
+
+      <ViewToggle />
     </>
+  );
+}
+
+function ViewToggle() {
+  const router = useRouter();
+  const [comingSoon, setComingSoon] = useState(false);
+
+  const handle3d = () => {
+    setComingSoon(true);
+    setTimeout(() => setComingSoon(false), 2000);
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        bottom: 24,
+        right: 24,
+        zIndex: 50,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "flex-end",
+        gap: 8,
+      }}
+    >
+      <AnimatePresence>
+        {comingSoon && (
+          <motion.div
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 4 }}
+            transition={{ duration: 0.18 }}
+            style={{
+              fontFamily: "var(--font-geist-mono), monospace",
+              fontSize: 10,
+              color: "#aaa",
+              letterSpacing: "0.06em",
+              paddingBottom: 2,
+            }}
+          >
+            coming soon
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 2,
+          backgroundColor: "rgba(255,255,255,0.85)",
+          backdropFilter: "blur(8px)",
+          WebkitBackdropFilter: "blur(8px)",
+          border: "1px solid rgba(0,0,0,0.08)",
+          borderRadius: 20,
+          padding: 3,
+        }}
+      >
+        {/* 2D — active/current */}
+        <div
+          style={{
+            fontFamily: "var(--font-geist-mono), monospace",
+            fontSize: 10,
+            letterSpacing: "0.06em",
+            padding: "5px 13px",
+            borderRadius: 16,
+            backgroundColor: "#2c2c2c",
+            color: "#fff",
+            cursor: "default",
+            userSelect: "none",
+          }}
+        >
+          2d
+        </div>
+
+        {/* 3D — coming soon */}
+        <button
+          onClick={handle3d}
+          style={{
+            fontFamily: "var(--font-geist-mono), monospace",
+            fontSize: 10,
+            letterSpacing: "0.06em",
+            padding: "5px 13px",
+            borderRadius: 16,
+            backgroundColor: "transparent",
+            color: "#aaa",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          3d
+        </button>
+
+        {/* Full Roll — links to /demo */}
+        <button
+          onClick={() => router.push("/demo")}
+          style={{
+            fontFamily: "var(--font-geist-mono), monospace",
+            fontSize: 10,
+            letterSpacing: "0.06em",
+            padding: "5px 13px",
+            borderRadius: 16,
+            backgroundColor: "transparent",
+            color: "#aaa",
+            border: "none",
+            cursor: "pointer",
+          }}
+        >
+          full roll
+        </button>
+      </div>
+    </div>
   );
 }

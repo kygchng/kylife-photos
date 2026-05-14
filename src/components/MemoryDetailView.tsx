@@ -1,17 +1,20 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import type { Memory } from "@/data/memories";
-import MarqueeStrip from "./MarqueeStrip";
+import DragElements from "@/components/fancy/blocks/drag-elements";
 
-const CARD_POSITIONS = [
-  { x: 0, y: -30, rotation: 0, zIndex: 6 },
-  { x: -190, y: -50, rotation: -8, zIndex: 5 },
-  { x: 175, y: -20, rotation: 6, zIndex: 4 },
-  { x: -90, y: 30, rotation: -3, zIndex: 3 },
-  { x: 110, y: 40, rotation: 7, zIndex: 2 },
-  { x: -230, y: 40, rotation: -12, zIndex: 1 },
+const CARD_W = 200;
+const CARD_H = 274;
+
+const SCATTER_OFFSETS = [
+  { x: 0,    y: -30,  rotate: 0  },
+  { x: -215, y: -50,  rotate: -7 },
+  { x: 202,  y: -20,  rotate: 5  },
+  { x: -100, y:  28,  rotate: -3 },
+  { x:  118, y:  40,  rotate: 8  },
+  { x: -258, y:  48,  rotate: -11},
 ];
 
 interface MemoryDetailViewProps {
@@ -19,30 +22,38 @@ interface MemoryDetailViewProps {
   onClose: () => void;
 }
 
-export default function MemoryDetailView({
-  memory,
-  onClose,
-}: MemoryDetailViewProps) {
-  const overlayRef = useRef<HTMLDivElement>(null);
+export default function MemoryDetailView({ memory, onClose }: MemoryDetailViewProps) {
+  const [closing, setClosing] = useState(false);
 
-  // Escape key to close
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose]);
-
-  // Click outside (on the overlay background) to close
-  const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === overlayRef.current) onClose();
+  const handleClose = () => {
+    setClosing(true);
+    onClose();
   };
+
+  const [initialPositions] = useState(() => {
+    const vw = typeof window !== "undefined" ? window.innerWidth : 1440;
+    const vh = typeof window !== "undefined" ? window.innerHeight : 900;
+    const areaH = Math.max(vh - 90, 600);
+    const centerX = vw / 2 - CARD_W / 2;
+    const centerY = areaH / 2 - CARD_H / 2;
+    return SCATTER_OFFSETS.map(({ x, y, rotate }) => ({
+      x: centerX + x,
+      y: centerY + y,
+      rotate,
+    }));
+  });
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") handleClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <motion.div
-      ref={overlayRef}
-      onClick={handleOverlayClick}
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
@@ -56,11 +67,12 @@ export default function MemoryDetailView({
         WebkitBackdropFilter: "blur(10px)",
         display: "flex",
         flexDirection: "column",
+        pointerEvents: closing ? "none" : "auto",
       }}
     >
       {/* Close button */}
       <button
-        onClick={onClose}
+        onClick={handleClose}
         style={{
           position: "absolute",
           top: 20,
@@ -88,12 +100,15 @@ export default function MemoryDetailView({
         style={{
           textAlign: "center",
           paddingTop: 28,
-          paddingBottom: 0,
+          paddingBottom: 4,
+          flexShrink: 0,
           fontFamily: "var(--font-lora), Georgia, serif",
           fontSize: 16,
           fontWeight: 600,
           color: "var(--text-title)",
           letterSpacing: "0.04em",
+          zIndex: 111,
+          position: "relative",
         }}
       >
         {memory.title}
@@ -111,119 +126,54 @@ export default function MemoryDetailView({
         </div>
       </motion.div>
 
-      {/* Draggable polaroid scatter area */}
-      <div
-        style={{
-          flex: 1,
-          position: "relative",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          minHeight: 0,
-        }}
-      >
-        {memory.images.map((src, i) => {
-          const pos = CARD_POSITIONS[i % CARD_POSITIONS.length];
-          return (
-            <DraggablePolaroidCard
+      {/* Draggable polaroid stack */}
+      <div style={{ flex: 1, position: "relative", minHeight: 0 }}>
+        <DragElements
+          initialPositions={initialPositions}
+          dragMomentum={true}
+          dragTransition={{ bounceStiffness: 140, bounceDamping: 18 }}
+          dragElastic={0.08}
+          selectedOnTop={true}
+          className=""
+        >
+          {memory.images.map((src, i) => (
+            <PolaroidCard
               key={i}
               src={src}
               title={memory.title}
               date={memory.date}
-              initialX={pos.x}
-              initialY={pos.y}
-              rotation={pos.rotation}
-              zIndex={pos.zIndex}
-              animDelay={i * 0.05}
+              animDelay={i * 0.06}
             />
-          );
-        })}
+          ))}
+        </DragElements>
       </div>
-
-      {/* Marquee strip at the bottom */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2, duration: 0.35 }}
-        style={{
-          flexShrink: 0,
-          paddingBottom: 0,
-          borderTop: "1px solid rgba(0,0,0,0.06)",
-        }}
-      >
-        <div
-          style={{
-            fontFamily: "var(--font-geist-mono), monospace",
-            fontSize: 9,
-            color: "#bbb",
-            letterSpacing: "0.12em",
-            textTransform: "uppercase",
-            padding: "8px 16px 4px",
-          }}
-        >
-          full roll
-        </div>
-        <MarqueeStrip memory={memory} />
-      </motion.div>
     </motion.div>
   );
 }
 
-interface DraggablePolaroidCardProps {
-  src: string;
-  title: string;
-  date: string;
-  initialX: number;
-  initialY: number;
-  rotation: number;
-  zIndex: number;
-  animDelay: number;
-}
-
-function DraggablePolaroidCard({
+function PolaroidCard({
   src,
   title,
   date,
-  initialX,
-  initialY,
-  rotation,
-  zIndex,
   animDelay,
-}: DraggablePolaroidCardProps) {
+}: {
+  src: string;
+  title: string;
+  date: string;
+  animDelay: number;
+}) {
   return (
     <motion.div
-      drag
-      dragMomentum={false}
-      initial={{
-        opacity: 0,
-        scale: 0.85,
-        x: initialX,
-        y: initialY,
-        rotate: rotation,
-      }}
-      animate={{
-        opacity: 1,
-        scale: 1,
-        x: initialX,
-        y: initialY,
-        rotate: rotation,
-      }}
-      whileDrag={{ scale: 1.06, zIndex: 200, cursor: "grabbing" }}
+      initial={{ opacity: 0, scale: 0.85 }}
+      animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: animDelay, duration: 0.3, ease: "easeOut" }}
       style={{
-        position: "absolute",
-        width: 200,
-        backgroundColor: "var(--polaroid-white)",
-        boxShadow: "var(--polaroid-shadow)",
+        width: CARD_W,
+        backgroundColor: "#ffffff",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.13), 0 1px 4px rgba(0,0,0,0.08)",
         padding: "10px 10px 0 10px",
-        cursor: "grab",
-        zIndex,
         willChange: "transform",
         touchAction: "none",
-      }}
-      whileHover={{
-        boxShadow: "var(--polaroid-shadow-hover)",
-        zIndex: zIndex + 10,
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -243,7 +193,7 @@ function DraggablePolaroidCard({
           style={{
             fontFamily: "var(--font-geist-mono), monospace",
             fontSize: 11,
-            color: "var(--text-caption)",
+            color: "#6b6560",
             whiteSpace: "nowrap",
             overflow: "hidden",
             textOverflow: "ellipsis",
