@@ -1,12 +1,20 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { motion } from "framer-motion";
 import type { Memory } from "@/data/memories";
 import DragElements from "@/components/fancy/blocks/drag-elements";
 
-const CARD_W = 200;
-const CARD_H = 274;
+// Portrait polaroid (2:3)
+const PORT_CARD_W = 200;
+const PORT_IMG_W = 180;
+const PORT_IMG_H = 270; // 180 × 3/2 = exact 2:3
+
+// Landscape polaroid (3:2)
+const LAND_CARD_W = 260;
+const LAND_IMG_W = 240;
+const LAND_IMG_H = 160; // 240 / 1.5 = exact 3:2
 
 const SCATTER_OFFSETS = [
   { x: 0,    y: -30,  rotate: 0  },
@@ -34,8 +42,9 @@ export default function MemoryDetailView({ memory, onClose }: MemoryDetailViewPr
     const vw = typeof window !== "undefined" ? window.innerWidth : 1440;
     const vh = typeof window !== "undefined" ? window.innerHeight : 900;
     const areaH = Math.max(vh - 90, 600);
-    const centerX = vw / 2 - CARD_W / 2;
-    const centerY = areaH / 2 - CARD_H / 2;
+    // Use portrait dims as anchor (larger card = safer center estimate)
+    const centerX = vw / 2 - PORT_CARD_W / 2;
+    const centerY = areaH / 2 - (10 + PORT_IMG_H + 34) / 2;
     return SCATTER_OFFSETS.map(({ x, y, rotate }) => ({
       x: centerX + x,
       y: centerY + y,
@@ -45,12 +54,14 @@ export default function MemoryDetailView({ memory, onClose }: MemoryDetailViewPr
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") handleClose();
+      if (e.key === "Escape") {
+        setClosing(true);
+        onClose();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [onClose]);
 
   return (
     <motion.div
@@ -136,10 +147,11 @@ export default function MemoryDetailView({ memory, onClose }: MemoryDetailViewPr
           selectedOnTop={true}
           className=""
         >
-          {memory.images.map((src, i) => (
+          {memory.images.map((img, i) => (
             <PolaroidCard
               key={i}
-              src={src}
+              src={img.src}
+              landscape={img.landscape}
               title={memory.title}
               date={memory.date}
               animDelay={i * 0.06}
@@ -153,22 +165,28 @@ export default function MemoryDetailView({ memory, onClose }: MemoryDetailViewPr
 
 function PolaroidCard({
   src,
+  landscape,
   title,
   date,
   animDelay,
 }: {
   src: string;
+  landscape?: boolean;
   title: string;
   date: string;
   animDelay: number;
 }) {
+  const cardW = landscape ? LAND_CARD_W : PORT_CARD_W;
+  const imgW = landscape ? LAND_IMG_W : PORT_IMG_W;
+  const imgH = landscape ? LAND_IMG_H : PORT_IMG_H;
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.85 }}
       animate={{ opacity: 1, scale: 1 }}
       transition={{ delay: animDelay, duration: 0.3, ease: "easeOut" }}
       style={{
-        width: CARD_W,
+        width: cardW,
         backgroundColor: "#ffffff",
         boxShadow: "0 4px 20px rgba(0,0,0,0.13), 0 1px 4px rgba(0,0,0,0.08)",
         padding: "10px 10px 0 10px",
@@ -176,17 +194,18 @@ function PolaroidCard({
         touchAction: "none",
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
         src={src}
         alt={title}
+        width={imgW}
+        height={imgH}
         style={{
-          width: "100%",
-          height: 220,
-          objectFit: "cover",
           display: "block",
+          width: "100%",
+          height: imgH,
         }}
         draggable={false}
+        unoptimized={src.startsWith("https://picsum")}
       />
       <div style={{ padding: "10px 4px 14px" }}>
         <div

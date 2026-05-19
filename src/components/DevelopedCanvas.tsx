@@ -1,51 +1,49 @@
 "use client";
 
 import { useState, useMemo, useEffect } from "react";
+import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { memories } from "@/data/memories";
 import { useCanvasControls } from "@/lib/useCanvasControls";
 import MemoryDetailView from "./MemoryDetailView";
 import type { Memory } from "@/data/memories";
 
-// Target: ~5 columns × ~3 rows visible at 1440×900 (no zoom ever)
-export const CELL_W = 290;
-export const CELL_H = 312;
+const CELL_W = 290;
+const CELL_H = 330;
 
 const PADDING_SIDE = 8;
 const PADDING_TOP = 8;
 const FOOTER_H = 36;
 
-// Portrait card
-const PORT_IMG_W = 160; // inner image width
-const PORT_IMG_H = 204;
+// Portrait card (2:3)
+const PORT_IMG_W = 160;
+const PORT_IMG_H = 240; // 160 × 3/2 = exact 2:3
 const PORT_CARD_W = PORT_IMG_W + PADDING_SIDE * 2; // 176
-const PORT_CARD_H = PADDING_TOP + PORT_IMG_H + FOOTER_H; // 248
+const PORT_CARD_H = PADDING_TOP + PORT_IMG_H + FOOTER_H; // 284
 
-// Landscape card
-const LAND_IMG_W = 232; // inner image width
-const LAND_IMG_H = 150;
-const LAND_CARD_W = LAND_IMG_W + PADDING_SIDE * 2; // 248
-const LAND_CARD_H = PADDING_TOP + LAND_IMG_H + FOOTER_H; // 194
+// Landscape card (3:2)
+const LAND_IMG_W = 216;
+const LAND_IMG_H = 144; // 216 / 1.5 = exact 3:2
+const LAND_CARD_W = LAND_IMG_W + PADDING_SIDE * 2; // 232
+const LAND_CARD_H = PADDING_TOP + LAND_IMG_H + FOOTER_H; // 188
 
 // Centering margins per orientation
 const PORT_MX = (CELL_W - PORT_CARD_W) / 2; // 57px
-const PORT_MY = (CELL_H - PORT_CARD_H) / 2; // 32px
-const LAND_MX = (CELL_W - LAND_CARD_W) / 2; // 21px
-const LAND_MY = (CELL_H - LAND_CARD_H) / 2; // 59px
+const PORT_MY = (CELL_H - PORT_CARD_H) / 2; // 23px
+const LAND_MX = (CELL_W - LAND_CARD_W) / 2; // 29px
+const LAND_MY = (CELL_H - LAND_CARD_H) / 2; // 71px
 
 const BUFFER = 2;
 const TILE_W = 5;
 const TILE_H = 3;
 
-function isLandscapeCell(col: number, row: number): boolean {
-  if (col === 0 && row === 0) return false; // kylife cell is always portrait-shaped
-  const val = col * 127 + row * 311 + col * row * 23;
-  return ((val % 4) + 4) % 4 === 1;
-}
-
-function getMemoryForCell(col: number, row: number): Memory | null {
+function getMemoryForCell(
+  col: number,
+  row: number,
+  memories: Memory[],
+): Memory | null {
   if (col === 0 && row === 0) return null;
+  if (memories.length === 0) return null;
   const tileCol = ((col % TILE_W) + TILE_W) % TILE_W;
   const tileRow = ((row % TILE_H) + TILE_H) % TILE_H;
   return memories[(tileRow * TILE_W + tileCol) % memories.length];
@@ -57,26 +55,37 @@ function GridCard({
   y,
   landscape,
   onClick,
+  enterDelay,
 }: {
   memory: Memory;
   x: number;
   y: number;
   landscape: boolean;
   onClick: () => void;
+  enterDelay?: number;
 }) {
   const cardW = landscape ? LAND_CARD_W : PORT_CARD_W;
+  const imgW = landscape ? LAND_IMG_W : PORT_IMG_W;
   const imgH = landscape ? LAND_IMG_H : PORT_IMG_H;
+  const isEntering = enterDelay !== undefined;
 
   return (
     <motion.div
       data-polaroid
       onClick={onClick}
+      initial={isEntering ? { scale: 0.78, opacity: 0 } : false}
+      animate={{ scale: 1, opacity: 1 }}
       whileHover={{
         scale: 1.045,
         zIndex: 10,
         boxShadow: "0 8px 32px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.10)",
+        transition: { duration: 0.16, ease: "easeOut" },
       }}
-      transition={{ duration: 0.16, ease: "easeOut" }}
+      transition={
+        isEntering
+          ? { delay: enterDelay, duration: 0.45, ease: [0.22, 1, 0.36, 1] }
+          : { duration: 0.16, ease: "easeOut" }
+      }
       style={{
         position: "absolute",
         left: x,
@@ -91,20 +100,19 @@ function GridCard({
         willChange: "transform",
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
+      <Image
         src={memory.coverImage}
         alt={memory.title}
-        width={cardW - PADDING_SIDE * 2}
+        width={imgW}
         height={imgH}
         style={{
           display: "block",
           width: "100%",
           height: imgH,
-          objectFit: "cover",
         }}
         draggable={false}
         loading="lazy"
+        unoptimized={memory.coverImage.startsWith("https://picsum")}
       />
       <div
         style={{
@@ -163,39 +171,36 @@ function KylifeCell({ x, y }: { x: number; y: number }) {
     >
       <div
         style={{
-          fontFamily: "var(--font-handwritten), Caveat, cursive",
-          fontSize: 58,
+          fontFamily: "var(--font-sans), sans-serif",
+          fontSize: 55,
           fontWeight: 700,
           color: "#2c5ccd",
           letterSpacing: "-0.02em",
           lineHeight: 1,
         }}
       >
-        kylife
-      </div>
-      <div
-        style={{
-          fontFamily: "var(--font-handwritten), Caveat, cursive",
-          fontSize: 14,
-          fontWeight: 400,
-          color: "#2c5ccd",
-          opacity: 0.7,
-          textAlign: "center",
-          maxWidth: 210,
-          lineHeight: 1.35,
-        }}
-      >
-        like kylie&apos;s life. haha get it
+        kylife.
       </div>
     </div>
   );
 }
 
-export default function DevelopedCanvas() {
+export default function DevelopedCanvas({
+  memories,
+  entering,
+}: {
+  memories: Memory[];
+  entering?: boolean;
+}) {
   const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
-  // Always start with the SSR-safe default so server and client first render match.
-  // onResize() is called inside the effect (not setState directly) to satisfy the
-  // no-direct-setState-in-effect lint rule while still syncing real dimensions after hydration.
+
+  // After 1.8s the intro bloom is done; new cells appearing from panning won't animate
+  const [isEntering, setIsEntering] = useState(!!entering);
+  useEffect(() => {
+    if (!entering) return;
+    const t = setTimeout(() => setIsEntering(false), 1800);
+    return () => clearTimeout(t);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [vpSize, setVpSize] = useState<{ w: number; h: number }>({
     w: 1440,
     h: 900,
@@ -209,7 +214,7 @@ export default function DevelopedCanvas() {
     const onResize = () =>
       setVpSize({ w: window.innerWidth, h: window.innerHeight });
     window.addEventListener("resize", onResize);
-    onResize(); // sync to real viewport after hydration
+    onResize();
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
@@ -291,10 +296,17 @@ export default function DevelopedCanvas() {
           }}
         >
           {visibleCells.map(({ col, row }) => {
-            const memory = getMemoryForCell(col, row);
-            const landscape = isLandscapeCell(col, row);
+            const memory = getMemoryForCell(col, row, memories);
+            const landscape = memory?.coverLandscape ?? false;
             const mx = landscape ? LAND_MX : PORT_MX;
             const my = landscape ? LAND_MY : PORT_MY;
+
+            // Radial stagger from center cell (0,0) — only during the initial bloom
+            const dist = isEntering
+              ? Math.sqrt(col * col + row * row)
+              : -1;
+            const enterDelay =
+              dist >= 0 ? Math.min(dist * 0.055, 0.45) : undefined;
 
             if (!memory) {
               return (
@@ -312,6 +324,7 @@ export default function DevelopedCanvas() {
                 memory={memory}
                 x={col * CELL_W + mx}
                 y={row * CELL_H + my}
+                enterDelay={enterDelay}
                 landscape={landscape}
                 onClick={() => setSelectedMemory(memory)}
               />
