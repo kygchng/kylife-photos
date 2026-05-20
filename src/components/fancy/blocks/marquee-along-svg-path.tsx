@@ -1,4 +1,4 @@
-import React, { RefObject, useCallback, useEffect, useRef } from "react";
+import React, { RefObject, useCallback, useEffect, useId, useRef } from "react";
 import {
   motion,
   SpringOptions,
@@ -224,9 +224,8 @@ const MarqueeAlongSvgPath = ({
     [enableRollingZIndex, zIndexBase, zIndexRange],
   );
 
-  // Generate a random ID for the path if not provided
-  const id =
-    pathId || `marquee-path-${Math.random().toString(36).substring(7)}`;
+  const generatedId = useId();
+  const id = pathId || `marquee-path-${generatedId}`;
 
   // Scroll tracking
   const { scrollY } = useScroll({
